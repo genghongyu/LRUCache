@@ -1,5 +1,5 @@
 requirements:
-    设计一个 LRU Cache，支持：
+    设计一个 LRU Cache(least recently used)，支持：
 
     get(key)：如果存在返回 value，否则返回 -1
     put(key, value)：
