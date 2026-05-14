@@ -1,72 +1,115 @@
 #include <iostream>
-#include <vector>
 #include <string>
+#include <iterator>
+#include <list>
+#include <unordered_map>
 
 using namespace std;
 
 class CLRUCache {
 public:
     explicit CLRUCache(int size):m_size(size) {
-        m_container.reserve(m_size);
+        m_map.reserve(m_size);
     }
-
 
     /*
-        获取key对应的value。
-        没找到，返回-1.
-        找到，返回value，并将元素移动到vector尾部，表示最新使用
+        Search key in the map.
+        (1) If found:
+            Return the corresponding value and move the element
+            to the end of the list (most recently used).
+        (2) If not found:
+            Return -1.
     */
     int get(int key) {
-        for (int i = 0; i < m_container.size(); i++) {
-            if (m_container[i].first == key) {
-                // 找到key
-                auto tmp_item = m_container[i];
-
-                // 删除元素
-                m_container.erase(m_container.begin() + i);
-
-                // 尾部追加元素
-                m_container.push_back(tmp_item);
-
-                return tmp_item.second;
-            }
+        auto iter = m_map.find(key);
+        if (iter == m_map.end()) {
+            return -1;
         }
 
-        return -1;
+        // Get value through iterator
+        auto value = (iter->second)->second;
+
+        // Remove the element from the list
+        m_list.erase(iter->second);
+
+        // Add the element to the tail
+        m_list.push_back({key, value});
+
+        // Update iterator stored in the map
+        auto new_iter = prev(m_list.end());
+        iter->second = new_iter;
+
+        return value;
     }
 
-    // 如果存在，更新。
-    // 不存在，push_back
-    // 超过容量，删除最旧（vector front）
+    /*
+        If the key already exists, update it.
+        If the key does not exist and capacity is not full, append it.
+        If the key does not exist and capacity is full,
+        remove the oldest element and append the new one.
+    */
     void put(int key, int val) {
-        for (int i = 0; i < m_container.size(); i++) {
-            if (m_container[i].first == key) {
-                // 找到，更新val，立即返回
-                m_container[i].second = val;
-                return;
-            }
+        if (m_map.count(key)) {
+            // Remove the existing element from the list
+            m_list.erase(m_map[key]);
+
+            // Add updated element to the tail
+            m_list.push_back({key, val});
+
+            // Update iterator stored in the map
+            auto new_iter = prev(m_list.end());
+            m_map[key] = new_iter;
+            return;
         }
 
-        // 判断是否满了
-        if (m_container.size() == m_size) {
-            m_container.erase(m_container.begin());
-        }
+        if (m_map.size() != m_size) {
+            // Cache is not full, append new element
+            m_list.push_back({key, val});
+            auto iter = prev(m_list.end());
+            m_map[key] = iter;
 
-        // 追加元素
-        m_container.push_back({key, val});
+            return;
+        } else {
+            // Cache is full
+
+            // Remove the oldest element from the list
+            auto item = m_list.front();
+            m_list.pop_front();
+
+            // Remove the corresponding key from the map
+            m_map.erase(item.first);
+
+            // Append the new element
+            m_list.push_back({key, val});
+            auto iter = prev(m_list.end());
+            m_map[key] = iter;
+
+            return;
+        }
     }
 
-    ///////////////////////////////////////////////
-    void showinfo() const {
-        cout << "size=" << m_container.size() << " capacity=" << m_container.capacity() << endl;
-        for (const auto& item : m_container) {
-            cout << "key=" << item.first << " value=" << item.second << endl;
+    /*
+        Display cache information
+    */
+   void showinfo() const {
+        cout << "---------------------------" << endl;
+
+        for(const auto& item : m_list) {
+            cout << "key=" << item.first
+                 << " val=" << item.second << endl;
         }
-    }
+
+        cout << "---------------------------" << endl;
+   }
 
 private:
     int m_size = 0;
-    vector<pair<int, int>> m_container;
+
+    // Store cache data in LRU order
+    list<pair<int, int>> m_list;
+
+    // key -> iterator in list
+    unordered_map<int, list<pair<int, int>>::iterator> m_map;
 };
 
 
@@ -74,17 +117,27 @@ int main()
 {
     CLRUCache cache(5);
 
-    // 追加元素
+    // Insert elements
     cache.put(1, 23);
     cache.put(5, 12);
     cache.put(12, 6);
-    cache.showinfo();
 
-    // 获取元素
+    // Get existing element
     cout << cache.get(5) << endl;
+
+    // Get non-existing element
+    cout << cache.get(51) << endl;
+
+    // Insert more elements
+    cache.put(4, 67);
+    cache.put(45, 2);
+
     cache.showinfo();
 
+    // Access element
+    cout << cache.get(4) << endl;
 
+    cache.showinfo();
 
     return 0;
 }
