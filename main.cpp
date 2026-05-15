@@ -6,7 +6,19 @@
 
 using namespace std;
 
+using ListIter = list<pair<int, int>>::iterator;
 class CLRUCache {
+private:
+    void add_to_tail(int key, int val) {
+        m_list.emplace_back(key, val);
+
+        // the iterator of the last element in list
+        auto iter = prev(m_list.end());
+
+        // add data into map
+        m_map[key] = iter;
+    }
+
 public:
     explicit CLRUCache(int size):m_size(size) {
         m_map.reserve(m_size);
@@ -26,20 +38,10 @@ public:
             return -1;
         }
 
-        // Get value through iterator
-        auto value = (iter->second)->second;
+        // move the found item to the tail of the list
+        m_list.splice(m_list.end(), m_list, iter->second);
 
-        // Remove the element from the list
-        m_list.erase(iter->second);
-
-        // Add the element to the tail
-        m_list.push_back({key, value});
-
-        // Update iterator stored in the map
-        auto new_iter = prev(m_list.end());
-        iter->second = new_iter;
-
-        return value;
+        return iter->second->second;
     }
 
     /*
@@ -49,40 +51,30 @@ public:
         remove the oldest element and append the new one.
     */
     void put(int key, int val) {
-        if (m_map.count(key)) {
-            // Remove the existing element from the list
-            m_list.erase(m_map[key]);
+        auto iter = m_map.find(key);
+        if (iter != m_map.end()) {
+            // find the key int the map, update the value
+            iter->second->second = val;
 
-            // Add updated element to the tail
-            m_list.push_back({key, val});
-
-            // Update iterator stored in the map
-            auto new_iter = prev(m_list.end());
-            m_map[key] = new_iter;
+            // update the pos in the list
+            m_list.splice(m_list.end(), m_list, iter->second);
             return;
         }
 
-        if (m_map.size() != m_size) {
-            // Cache is not full, append new element
-            m_list.push_back({key, val});
-            auto iter = prev(m_list.end());
-            m_map[key] = iter;
-
+        if (m_map.size() < m_size) {
+            // Cache is not full, append new element to the list and map
+            add_to_tail(key, val);
             return;
         } else {
             // Cache is full
+            // Remove the corresponding key from the map
+            m_map.erase(m_list.front().first);
 
             // Remove the oldest element from the list
-            auto item = m_list.front();
             m_list.pop_front();
 
-            // Remove the corresponding key from the map
-            m_map.erase(item.first);
-
             // Append the new element
-            m_list.push_back({key, val});
-            auto iter = prev(m_list.end());
-            m_map[key] = iter;
+            add_to_tail(key, val);
 
             return;
         }
@@ -92,24 +84,20 @@ public:
         Display cache information
     */
    void showinfo() const {
-        cout << "---------------------------" << endl;
-
         for(const auto& item : m_list) {
             cout << "key=" << item.first
                  << " val=" << item.second << endl;
         }
-
-        cout << "---------------------------" << endl;
    }
 
 private:
-    int m_size = 0;
+    size_t m_size = 0;
 
     // Store cache data in LRU order
     list<pair<int, int>> m_list;
 
     // key -> iterator in list
-    unordered_map<int, list<pair<int, int>>::iterator> m_map;
+    unordered_map<int, ListIter> m_map;
 };
 
 
